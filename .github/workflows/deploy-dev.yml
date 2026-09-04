@@ -28,7 +28,7 @@ jobs:
           ref: stack-transit-dev
           path: temp-stack
 
-      # Step 3: Copy stack files over code files before Python setup runs
+      # Step 3: Overlay stack files on top of code files
       - name: Overlay Stack Configuration
         run: |
           cp -f temp-stack/Pulumi.dev.yaml ./
@@ -42,9 +42,11 @@ jobs:
         with:
           python-version: '3.11'
 
-      # Step 5: Install Python dependencies
-      - name: Install Dependencies
+      # Step 5: Create virtual environment and install dependencies
+      - name: Install Dependencies into Virtual Environment
         run: |
+          python -m venv venv
+          source venv/bin/activate
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
