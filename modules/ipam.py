@@ -12,7 +12,6 @@ VLAN_SPECS = [
 
 class IPAMModule:
     def __init__(self, opts: pulumi.ResourceOptions):
-        # Uses delete_before_replace to safely handle IP range updates
         self.prefix_opts = opts.merge(pulumi.ResourceOptions(delete_before_replace=True))
         self.opts = opts
         self.vlans = {}
@@ -39,6 +38,7 @@ class IPAMModule:
             offset = vspec["offset"]
             mask = vspec["mask"]
 
+            # 1. Create VLAN first
             vlan = netbox.Vlan(
                 f"vlan-{site_slug}-{vid}",
                 vid=vid,
@@ -49,6 +49,12 @@ class IPAMModule:
             )
             self.vlans[f"{site_slug}-{vid}"] = vlan
 
+            # 2. Enforce explicit dependency so Prefix creation waits for VLAN
+            prefix_options = self.prefix_opts.merge(
+                pulumi.ResourceOptions(depends_on=[vlan])
+            )
+
+            # 3. Create Prefix attached to VLAN
             self.prefixes[f"{site_slug}-{vid}"] = netbox.Prefix(
                 f"prefix-{site_slug}-{vid}",
                 prefix=f"10.{net_id}.{offset}.0/{mask}",
@@ -56,5 +62,5 @@ class IPAMModule:
                 vlan_id=vlan.id,
                 status="active",
                 description=f"{vname} Subnet",
-                opts=self.prefix_opts,
+                opts=prefix_options,
             )
