@@ -1,0 +1,4 @@
+encryptionsalt: v1:your-encryption-salt-here
+config:
+  ne-netbox-pulumi:environment: dev
+  ne-netbox-pulumi:region_slug: us-east-dev

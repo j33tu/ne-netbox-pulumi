@@ -1,0 +1,3 @@
+name: ne-netbox-pulumi
+runtime: python
+description: NetBox infrastructure deployment project using Pulumi
