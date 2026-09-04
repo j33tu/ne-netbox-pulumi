@@ -1,39 +1,30 @@
-name: NetBox Pulumi Deployment
+name: Deploy Dev NetBox Infrastructure
 
 on:
   push:
     branches:
-      - dev        # Triggers on changes pushed to your dev stack branch
+      - code-dev
 
 jobs:
-  deploy:
+  deploy-dev:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Set up Python
+      - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-          cache: 'pip'
 
       - name: Install Dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
+        run: pip install -r requirements.txt
 
-      - name: Setup Pulumi CLI
-        uses: pulumi/actions@v5
-
-      - name: Pulumi Deploy
+      - name: Pulumi Up
         uses: pulumi/actions@v5
         with:
           command: up
           stack-name: dev
         env:
-          PULUMI_BACKEND_URL: 's3://your-state-bucket'
-          NETBOX_SERVER_URL: ${{ secrets.NETBOX_DEV_URL }}
-          NETBOX_API_TOKEN: ${{ secrets.NETBOX_DEV_TOKEN }}
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          NETBOX_DEV_TOKEN: ${{ secrets.NETBOX_DEV_TOKEN }}
+          # PULUMI_BACKEND_URL: 's3://your-state-bucket' # If using self-hosted state
