@@ -1,49 +1,39 @@
-name: Deploy to NetBox Dev
+name: NetBox Pulumi Deployment
 
 on:
-    push:
-        branches:
-            - stack-transit-dev
+  push:
+    branches:
+      - dev        # Triggers on changes pushed to your dev stack branch
 
 jobs:
-    deploy-dev:
-        runs-on: ubuntu-latest
-        steps:
-            - name: Checkout Code (code-dev)
-              uses: actions/checkout@v4
-              with:
-                  ref: code-dev
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
 
-            - name: Checkout Stack Config (stack-transit-dev)
-              uses: actions/checkout@v4
-              with:
-                  ref: stack-transit-dev
-                  token: ${{ secrets.GITHUB_TOKEN }}
-                  path: temp-stack
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
 
-            - name: Merge Stack Files into Workspace
-              run: |
-                  # Copy Pulumi stack configuration files into the root project directory
-                  cp temp-stack/Pulumi.dev.yaml ./ || true
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
 
-            - name: Set up Python
-              uses: actions/setup-python@v5
-              with:
-                  python-version: "3.11"
-                  cache: "pip"
+      - name: Setup Pulumi CLI
+        uses: pulumi/actions@v5
 
-            - name: Install Dependencies
-              run: |
-                  python -m pip install --upgrade pip
-                  pip install -r requirements.txt
-
-            - name: Run Pulumi Up (Dev)
-              uses: pulumi/actions@v5
-              with:
-                  command: up
-                  stack_name: dev
-              env:
-                  PULUMI_ACCESS_TOKEN: ${{ secrets.PULUMI_ACCESS_TOKEN }}
-                  PULUMI_CONFIG_PASSPHRASE: ${{ secrets.PULUMI_CONFIG_PASSPHRASE }}
-                  NETBOX_SERVER_URL: https://myas9346.cloud.netboxapp.com
-                  NETBOX_API_TOKEN: ${{ secrets.DEV_NETBOX_TOKEN }}
+      - name: Pulumi Deploy
+        uses: pulumi/actions@v5
+        with:
+          command: up
+          stack-name: dev
+        env:
+          PULUMI_BACKEND_URL: 's3://your-state-bucket'
+          NETBOX_SERVER_URL: ${{ secrets.NETBOX_DEV_URL }}
+          NETBOX_API_TOKEN: ${{ secrets.NETBOX_DEV_TOKEN }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
