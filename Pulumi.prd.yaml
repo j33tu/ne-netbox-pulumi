@@ -1,0 +1,5 @@
+YAML
+encryptionsalt: v1:your-encryption-salt-here
+config:
+  ne-netbox-pulumi:environment: prd
+  ne-netbox-pulumi:region_slug: us-east-prd
