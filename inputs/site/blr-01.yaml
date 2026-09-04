@@ -2,7 +2,7 @@ region: "APAC"
 subregion: "IND"
 country: "India"
 site_code: "BLR01"
-site_name: "Bengaluru Site 01"
+site_name: "BLR01"
 network_id: 10 # Used to compute 10.10.0.0/16 and individual VLAN prefixes
 
 floors:

@@ -1,8 +1,8 @@
 region: "EMEA"
-subregion: "JPN"
-country: "JAPAN"
-site_code: "TOK01"
-site_name: "TOK01"
+subregion: "UK"
+country: "UK"
+site_code: "LON01"
+site_name: "LON01"
 network_id: 11 # Used to compute 10.10.0.0/16 and individual VLAN prefixes
 
 floors:
