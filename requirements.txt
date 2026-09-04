@@ -1,2 +1,2 @@
 pulumi>=3.0.0,<4.0.0
-pulumi-netbox @ git+https://github.com/e-breuninger/pulumi-netbox.git
+pulumi-netbox @ git+https://github.com/e-breuninger/terraform-provider-netbox.git
