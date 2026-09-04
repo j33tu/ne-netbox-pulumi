@@ -9,6 +9,9 @@ on:
       - 'Pulumi.yaml'
       - 'inputs/**'
 
+env:
+  ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: "true"
+
 jobs:
   deploy-dev:
     name: Pulumi Preview & Deploy (Dev)
@@ -87,6 +90,7 @@ jobs:
           command: preview
           stack-name: dev
         env:
+          PYTHONPATH: .
           PULUMI_BACKEND_URL: 'azblob://stpulumistatedev1'
           AZURE_STORAGE_ACCOUNT: ${{ secrets.AZURE_STORAGE_ACCOUNT }}
           AZURE_STORAGE_KEY: ${{ secrets.AZURE_STORAGE_KEY }}
@@ -100,6 +104,7 @@ jobs:
           command: up
           stack-name: dev
         env:
+          PYTHONPATH: .
           PULUMI_BACKEND_URL: 'azblob://stpulumistatedev1'
           AZURE_STORAGE_ACCOUNT: ${{ secrets.AZURE_STORAGE_ACCOUNT }}
           AZURE_STORAGE_KEY: ${{ secrets.AZURE_STORAGE_KEY }}
