@@ -8,10 +8,10 @@ import pulumi_netbox as netbox
 created_sites = {}
 
 # 1. Locate all YAML files in the inputs directory
-input_files = glob.glob(os.path.join("inputs", "*.yaml"))
+input_files = glob.glob(os.path.join("inputs/site", "*.yaml"))
 
 if not input_files:
-    pulumi.log.warn("No site input files found in inputs/ folder.")
+    pulumi.log.warn("No site input files found in inputs/site folder.")
 
 # 2. Iterate through each site file and provision resources
 for file_path in input_files:
