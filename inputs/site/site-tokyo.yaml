@@ -3,7 +3,7 @@ subregion: "JPN"
 country: "JAPAN"
 site_code: "TOK01"
 site_name: "TOK01"
-network_id: 11 # Used to compute 10.10.0.0/16 and individual VLAN prefixes
+network_id: 12 # Used to compute 10.10.0.0/16 and individual VLAN prefixes
 
 floors:
   - floor_number: "09"
