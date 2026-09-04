@@ -1,5 +1,5 @@
 config:
   ne-netbox-pulumi:environment: dev
   ne-netbox-pulumi:netbox_url: https://myas9346.cloud.netboxapp.com
-  ne-netbox-pulumi:region_slug: us-east-dev2
+  ne-netbox-pulumi:region_slug: us-east-dev
 
