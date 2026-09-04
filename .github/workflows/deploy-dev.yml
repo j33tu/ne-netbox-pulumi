@@ -45,26 +45,29 @@ jobs:
         with:
           python-version: '3.11'
 
-      # Step 5: Install dependencies in system Python AND local venv
+      # Step 5: Setup Pulumi CLI (Placed before pip to support setup scripts)
+      - name: Setup Pulumi CLI
+        uses: pulumi/actions@v5
+
+      # Step 6: Install dependencies globally and in virtualenv
       - name: Install Dependencies
         run: |
-          # 1. Install globally in runner Python
+          # 1. Pre-install plugin if required by pip package build scripts
+          pulumi plugin install resource netbox 0.0.3 || true
+
+          # 2. Upgrade pip and install requirements globally
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-          # 2. Install inside local venv for Pulumi runtime lookup
+          # 3. Create venv and install dependencies inside it
           python -m venv venv
           ./venv/bin/python -m pip install --upgrade pip
           ./venv/bin/pip install -r requirements.txt
 
-          # 3. Export PATH and PYTHONPATH across runner steps
+          # 4. Export virtualenv and site-packages to environment
           SITE_PACKAGES=$(python -c "import site; print(site.getsitepackages()[0])")
           echo "$GITHUB_WORKSPACE/venv/bin" >> $GITHUB_PATH
           echo "PYTHONPATH=.:$SITE_PACKAGES:$GITHUB_WORKSPACE/venv/lib/python3.11/site-packages" >> $GITHUB_ENV
-
-      # Step 6: Setup Pulumi CLI
-      - name: Setup Pulumi CLI
-        uses: pulumi/actions@v5
 
       # Step 7: Auto-create container if missing
       - name: Create Azure Container if Missing
@@ -94,7 +97,7 @@ jobs:
           AZURE_STORAGE_KEY: ${{ secrets.AZURE_STORAGE_KEY }}
           PULUMI_CONFIG_PASSPHRASE: ${{ secrets.PULUMI_CONFIG_PASSPHRASE }}
 
-      # Step 10: Run Pulumi Preview directly
+      # Step 10: Run Pulumi Preview directly in shell context
       - name: Pulumi Preview
         run: pulumi preview --stack dev --non-interactive
         env:
@@ -104,7 +107,7 @@ jobs:
           NETBOX_DEV_TOKEN: ${{ secrets.NETBOX_DEV_TOKEN }}
           PULUMI_CONFIG_PASSPHRASE: ${{ secrets.PULUMI_CONFIG_PASSPHRASE }}
 
-      # Step 11: Apply changes to NetBox directly
+      # Step 11: Apply changes to NetBox directly in shell context
       - name: Pulumi Deploy
         run: pulumi up --stack dev --yes --non-interactive
         env:
