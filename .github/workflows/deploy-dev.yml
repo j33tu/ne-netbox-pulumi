@@ -28,7 +28,7 @@ jobs:
           ref: stack-transit-dev
           path: temp-stack
 
-      # Step 3: Copy stack files over code files before Python setup runs
+      # Step 3: Copy stack files over code files
       - name: Overlay Stack Configuration
         run: |
           cp -f temp-stack/Pulumi.dev.yaml ./
@@ -36,7 +36,7 @@ jobs:
           if [ -d "temp-stack/inputs" ]; then cp -rf temp-stack/inputs ./; fi
           rm -rf temp-stack
 
-      # Step 4: Setup Python environment (cache removed to prevent early lookup errors)
+      # Step 4: Setup Python environment
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
@@ -52,9 +52,9 @@ jobs:
       - name: Setup Pulumi CLI
         uses: pulumi/actions@v5
 
-      # Step 7: Authenticate with Azure State Backend
+      # Step 7: Login to Azure State Backend using stpulumistatedev1
       - name: Login to Azure Blob State Backend
-        run: pulumi login azblob://pulumistate
+        run: pulumi login azblob://stpulumistatedev1
         env:
           AZURE_STORAGE_ACCOUNT: ${{ secrets.AZURE_STORAGE_ACCOUNT }}
           AZURE_STORAGE_KEY: ${{ secrets.AZURE_STORAGE_KEY }}
@@ -62,7 +62,7 @@ jobs:
       - name: Select or Create Dev Stack
         run: pulumi stack select dev || pulumi stack init dev
         env:
-          PULUMI_BACKEND_URL: 'azblob://pulumistate'
+          PULUMI_BACKEND_URL: 'azblob://stpulumistatedev1'
           AZURE_STORAGE_ACCOUNT: ${{ secrets.AZURE_STORAGE_ACCOUNT }}
           AZURE_STORAGE_KEY: ${{ secrets.AZURE_STORAGE_KEY }}
 
@@ -73,7 +73,7 @@ jobs:
           command: preview
           stack-name: dev
         env:
-          PULUMI_BACKEND_URL: 'azblob://pulumistate'
+          PULUMI_BACKEND_URL: 'azblob://stpulumistatedev1'
           AZURE_STORAGE_ACCOUNT: ${{ secrets.AZURE_STORAGE_ACCOUNT }}
           AZURE_STORAGE_KEY: ${{ secrets.AZURE_STORAGE_KEY }}
           NETBOX_DEV_TOKEN: ${{ secrets.NETBOX_DEV_TOKEN }}
@@ -85,7 +85,7 @@ jobs:
           command: up
           stack-name: dev
         env:
-          PULUMI_BACKEND_URL: 'azblob://pulumistate'
+          PULUMI_BACKEND_URL: 'azblob://stpulumistatedev1'
           AZURE_STORAGE_ACCOUNT: ${{ secrets.AZURE_STORAGE_ACCOUNT }}
           AZURE_STORAGE_KEY: ${{ secrets.AZURE_STORAGE_KEY }}
           NETBOX_DEV_TOKEN: ${{ secrets.NETBOX_DEV_TOKEN }}
