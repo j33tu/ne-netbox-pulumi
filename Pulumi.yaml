@@ -1,6 +1,4 @@
 name: ne-netbox-pulumi
 runtime:
   name: python
-  options:
-    virtualenv: venv
 description: Pulumi infrastructure automation for NetBox
