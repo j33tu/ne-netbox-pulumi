@@ -49,21 +49,21 @@ jobs:
       - name: Setup Pulumi CLI
         uses: pulumi/actions@v5
 
-      # Step 6: Install dependencies skipping build-time plugin verification
+      # Step 6: Install dependencies using pre-built wheels
       - name: Install Dependencies
         run: |
-          # Upgrade pip
-          python -m pip install --upgrade pip
-
-          # Create virtualenv
+          # 1. Upgrade build tools
+          python -m pip install --upgrade pip setuptools wheel
+          
+          # 2. Setup venv and upgrade build tools inside venv
           python -m venv venv
-          ./venv/bin/python -m pip install --upgrade pip
+          ./venv/bin/python -m pip install --upgrade pip setuptools wheel
 
-          # Install packages bypassing wheel build isolation plugin checks
-          PULUMI_SKIP_UPDATE_CHECK=true pip install --no-build-isolation -r requirements.txt || pip install -r requirements.txt
-          PULUMI_SKIP_UPDATE_CHECK=true ./venv/bin/pip install --no-build-isolation -r requirements.txt || ./venv/bin/pip install -r requirements.txt
+          # 3. Pre-install dependencies with binary preference
+          PULUMI_SKIP_UPDATE_CHECK=true pip install --prefer-binary -r requirements.txt
+          PULUMI_SKIP_UPDATE_CHECK=true ./venv/bin/pip install --prefer-binary -r requirements.txt
 
-          # Export virtualenv and site-packages to environment
+          # 4. Export virtual environment paths
           SITE_PACKAGES=$(python -c "import site; print(site.getsitepackages()[0])")
           echo "$GITHUB_WORKSPACE/venv/bin" >> $GITHUB_PATH
           echo "PYTHONPATH=.:$SITE_PACKAGES:$GITHUB_WORKSPACE/venv/lib/python3.11/site-packages" >> $GITHUB_ENV
@@ -96,7 +96,7 @@ jobs:
           AZURE_STORAGE_KEY: ${{ secrets.AZURE_STORAGE_KEY }}
           PULUMI_CONFIG_PASSPHRASE: ${{ secrets.PULUMI_CONFIG_PASSPHRASE }}
 
-      # Step 10: Run Pulumi Preview directly in shell context
+      # Step 10: Run Pulumi Preview
       - name: Pulumi Preview
         run: pulumi preview --stack dev --non-interactive
         env:
@@ -106,7 +106,7 @@ jobs:
           NETBOX_DEV_TOKEN: ${{ secrets.NETBOX_DEV_TOKEN }}
           PULUMI_CONFIG_PASSPHRASE: ${{ secrets.PULUMI_CONFIG_PASSPHRASE }}
 
-      # Step 11: Apply changes to NetBox directly in shell context
+      # Step 11: Apply changes to NetBox
       - name: Pulumi Deploy
         run: pulumi up --stack dev --yes --non-interactive
         env:
