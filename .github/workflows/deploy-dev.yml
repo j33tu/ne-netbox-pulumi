@@ -45,15 +45,16 @@ jobs:
         with:
           python-version: '3.11'
 
-      # Step 5: Create virtualenv, install packages, and export PATH
+      # Step 5: Create virtualenv, install dependencies, and register PATH/PYTHON
       - name: Install Dependencies
         run: |
           python -m venv venv
           ./venv/bin/python -m pip install --upgrade pip
           ./venv/bin/pip install -r requirements.txt
           
-          # Force runner PATH to prioritize virtualenv binaries
+          # Force runner to use the virtual environment python interpreter
           echo "$GITHUB_WORKSPACE/venv/bin" >> $GITHUB_PATH
+          echo "PULUMI_PYTHON_CMD=$GITHUB_WORKSPACE/venv/bin/python" >> $GITHUB_ENV
 
       # Step 6: Setup Pulumi CLI
       - name: Setup Pulumi CLI
@@ -94,6 +95,7 @@ jobs:
           command: preview
           stack-name: dev
         env:
+          PULUMI_PYTHON_CMD: ${{ github.workspace }}/venv/bin/python
           PULUMI_BACKEND_URL: 'azblob://stpulumistatedev1'
           AZURE_STORAGE_ACCOUNT: ${{ secrets.AZURE_STORAGE_ACCOUNT }}
           AZURE_STORAGE_KEY: ${{ secrets.AZURE_STORAGE_KEY }}
@@ -107,6 +109,7 @@ jobs:
           command: up
           stack-name: dev
         env:
+          PULUMI_PYTHON_CMD: ${{ github.workspace }}/venv/bin/python
           PULUMI_BACKEND_URL: 'azblob://stpulumistatedev1'
           AZURE_STORAGE_ACCOUNT: ${{ secrets.AZURE_STORAGE_ACCOUNT }}
           AZURE_STORAGE_KEY: ${{ secrets.AZURE_STORAGE_KEY }}
