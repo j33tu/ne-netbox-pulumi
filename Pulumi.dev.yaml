@@ -4,6 +4,10 @@ config:
   ne-netbox-pulumi:environment: dev
   ne-netbox-pulumi:netbox_url: https://myas9346.cloud.netboxapp.com
   ne-netbox-pulumi:region_slug: us-east-dev
+<<<<<<< HEAD
   ne-netbox-pulumi:netbox_api_token:
     secure: v1:fnN69DracQeNiNql:vDmZdZJfdVP6Lzf48VjHpeOIJsDz+bKnvFYItJaZrlveKkTOhfTfztN/MgvL/B3e6Qum79BBg7W53L10kvRbzZSGLcB4/MGYqg==
 encryptionsalt: v1:LS+a5YtAWhY=:v1:JRsVe6q9W1BjRGQ9:mD9fHIXM/NSjsaF75VNFl0AhjiLxlg==
+=======
+  ne-netbox-pulumi:netbox_url: https://myas9346.cloud.netboxapp.com
+>>>>>>> 54420f61294a6b41c055940a58bed9cfed6610dd
