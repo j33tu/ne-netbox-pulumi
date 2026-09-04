@@ -50,13 +50,22 @@ jobs:
         uses: pulumi/actions@v5
 
       # Step 6: Generate the NetBox provider SDK (Terraform-bridged, e-breuninger)
-      # Replaces the abandoned pip package `pulumi-netbox==0.0.3`.
-      # This downloads the provider plugin and writes a local SDK entry
-      # into requirements.txt automatically.
+      # This downloads the provider plugin and writes the SDK to ./sdks/netbox
+      # plus registers it in Pulumi.yaml. It does NOT install it into Python
+      # or touch requirements.txt — that's handled in the next step.
       - name: Add NetBox Provider SDK
         run: pulumi package add terraform-provider e-breuninger/netbox
 
-      # Step 7: Install dependencies using pre-built wheels
+      # Step 7: Wire the local SDK into requirements.txt
+      # Remove any stale reference to the old abandoned PyPI package,
+      # then point requirements.txt at the freshly generated local SDK.
+      - name: Link Local NetBox SDK into requirements.txt
+        run: |
+          sed -i '/^pulumi[-_]netbox/d' requirements.txt || true
+          echo "sdks/netbox" >> requirements.txt
+          cat requirements.txt
+
+      # Step 8: Install dependencies using pre-built wheels
       - name: Install Dependencies
         run: |
           # 1. Upgrade build tools
@@ -75,7 +84,7 @@ jobs:
           echo "$GITHUB_WORKSPACE/venv/bin" >> $GITHUB_PATH
           echo "PYTHONPATH=.:$SITE_PACKAGES:$GITHUB_WORKSPACE/venv/lib/python3.11/site-packages" >> $GITHUB_ENV
 
-      # Step 8: Auto-create container if missing
+      # Step 9: Auto-create container if missing
       - name: Create Azure Container if Missing
         run: |
           az storage container create \
@@ -87,14 +96,14 @@ jobs:
           AZURE_STORAGE_ACCOUNT: ${{ secrets.AZURE_STORAGE_ACCOUNT }}
           AZURE_STORAGE_KEY: ${{ secrets.AZURE_STORAGE_KEY }}
 
-      # Step 9: Authenticate to Azure Blob State Backend
+      # Step 10: Authenticate to Azure Blob State Backend
       - name: Login to Azure Blob State Backend
         run: pulumi login azblob://stpulumistatedev1
         env:
           AZURE_STORAGE_ACCOUNT: ${{ secrets.AZURE_STORAGE_ACCOUNT }}
           AZURE_STORAGE_KEY: ${{ secrets.AZURE_STORAGE_KEY }}
 
-      # Step 10: Select or create the dev stack with passphrase
+      # Step 11: Select or create the dev stack with passphrase
       - name: Select or Create Dev Stack
         run: pulumi stack select dev || pulumi stack init dev
         env:
@@ -103,7 +112,7 @@ jobs:
           AZURE_STORAGE_KEY: ${{ secrets.AZURE_STORAGE_KEY }}
           PULUMI_CONFIG_PASSPHRASE: ${{ secrets.PULUMI_CONFIG_PASSPHRASE }}
 
-      # Step 11: Run Pulumi Preview
+      # Step 12: Run Pulumi Preview
       - name: Pulumi Preview
         run: pulumi preview --stack dev --non-interactive
         env:
@@ -113,7 +122,7 @@ jobs:
           NETBOX_DEV_TOKEN: ${{ secrets.NETBOX_DEV_TOKEN }}
           PULUMI_CONFIG_PASSPHRASE: ${{ secrets.PULUMI_CONFIG_PASSPHRASE }}
 
-      # Step 12: Apply changes to NetBox
+      # Step 13: Apply changes to NetBox
       - name: Pulumi Deploy
         run: pulumi up --stack dev --yes --non-interactive
         env:
