@@ -32,28 +32,19 @@ VLAN_SPECS = [
     {"vid": 255, "name": "MGMT",     "offset": 254, "mask": 23},
 ]
 
-# Track regions created in the *current* execution run
-regions_cache = {}
+# Track region resources in memory across all YAML files in the stack
+region_resources = {}
 created_sites = {}
 
 
-def get_or_create_region(region_name: str, parent_region_id=None) -> pulumi.Output[int]:
+def get_or_create_region(region_name: str, parent_region_id=None):
     """
-    Looks up whether a region exists in NetBox. Reuses it if found,
-    or creates a new netbox.Region resource if it doesn't exist.
+    Ensures a single netbox.Region Pulumi resource is registered per unique slug.
+    Reuses the existing Pulumi resource if referenced multiple times across site files.
     """
-    slug = region_name.lower().replace(" ", "-")
-    cache_key = slug
-
-    if cache_key in regions_cache:
-        return regions_cache[cache_key]
-
-    # Check NetBox for an existing region using data lookup
-    try:
-        existing = netbox.get_region(slug=slug, opts=opts)
-        region_id = pulumi.Output.from_input(existing.id)
-    except Exception:
-        # If lookup fails/not found, create a new Region resource
+    slug = region_name.lower().strip().replace(" ", "-")
+    
+    if slug not in region_resources:
         resource_args = {
             "name": region_name,
             "slug": slug,
@@ -61,19 +52,19 @@ def get_or_create_region(region_name: str, parent_region_id=None) -> pulumi.Outp
         if parent_region_id is not None:
             resource_args["parent_region_id"] = parent_region_id
 
+        # Use distinct prefix for resource naming
         prefix = "subregion" if parent_region_id is not None else "region"
-        new_region = netbox.Region(
+        
+        region_resources[slug] = netbox.Region(
             f"{prefix}-{slug}",
             **resource_args,
             opts=opts,
         )
-        region_id = new_region.id
 
-    regions_cache[cache_key] = region_id
-    return region_id
+    return region_resources[slug]
 
 
-# 2. Processing Input Files
+# 2. Process Input YAML Files
 input_files = glob.glob("inputs/site/*.yaml") + glob.glob("inputs/site/*.yml")
 
 if not input_files:
@@ -96,32 +87,30 @@ for file_path in input_files:
     site_name = site_data.get("site_name", site_code)
     net_id = site_data.get("network_id")
 
-    # A. Parent Region Lookup or Creation
-    parent_region_id = None
-    if "region" in site_data and site_data["region"]:
-        parent_region_id = get_or_create_region(site_data["region"])
+    # A. Parent Region (e.g., APAC, EMEA)
+    parent_region = None
+    if site_data.get("region"):
+        parent_region = get_or_create_region(site_data["region"])
 
-    # B. Subregion Lookup or Creation
-    sub_region_id = None
-    if "subregion" in site_data and site_data["subregion"]:
-        sub_region_id = get_or_create_region(
-            site_data["subregion"], 
-            parent_region_id=parent_region_id
-        )
+    # B. Subregion (e.g., IND, JPN, UK)
+    sub_region = None
+    if site_data.get("subregion"):
+        parent_id = parent_region.id if parent_region else None
+        sub_region = get_or_create_region(site_data["subregion"], parent_region_id=parent_id)
 
-    # C. Site Resource
+    # C. Site Creation
     site_args = {
         "name": site_name,
         "slug": site_slug,
         "status": "active",
         "comments": f"Country: {site_data.get('country', 'N/A')}",
     }
-    
-    # Assign region ID priority (Subregion > Parent Region)
-    if sub_region_id is not None:
-        site_args["region_id"] = sub_region_id
-    elif parent_region_id is not None:
-        site_args["region_id"] = parent_region_id
+
+    # Region precedence: Subregion > Parent Region
+    if sub_region:
+        site_args["region_id"] = sub_region.id
+    elif parent_region:
+        site_args["region_id"] = parent_region.id
 
     site = netbox.Site(
         f"site-{site_slug}",
@@ -129,7 +118,7 @@ for file_path in input_files:
         opts=opts,
     )
 
-    # D. Location Hierarchy & Racks
+    # D. Location Hierarchy (BLR01-02-IDF) & Racks (BLR01-02-IDF-R01)
     floors = site_data.get("floors", [])
     for fl in floors:
         fl_num = str(fl["floor_number"]).zfill(2)
@@ -163,9 +152,8 @@ for file_path in input_files:
                     opts=opts,
                 )
 
-    # E. Parent Subnet & VLAN Allocation
+    # E. Network & VLAN Setup
     if net_id is not None:
-        # Create Parent /16 Prefix (e.g., 10.10.0.0/16)
         parent_cidr = f"10.{net_id}.0.0/16"
         netbox.Prefix(
             f"prefix-{site_slug}-10_{net_id}_0_0_16",
@@ -176,7 +164,6 @@ for file_path in input_files:
             opts=opts,
         )
 
-        # Create Specific VLANs and Subnets
         for vspec in VLAN_SPECS:
             vid = vspec["vid"]
             vname = vspec["name"]
