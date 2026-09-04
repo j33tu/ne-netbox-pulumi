@@ -1,70 +1,10 @@
-name: Deploy Dev NetBox Infrastructure
-
-on:
-  push:
-    branches:
-      - stack-transit-dev
-    paths:
-      - 'Pulumi.dev.yaml'
-      - 'Pulumi.yaml'
-      - 'inputs/**'
-
-jobs:
-  deploy-dev:
-    name: Pulumi Preview & Deploy (Dev)
-    runs-on: ubuntu-latest
-
-    steps:
-      # Step 1: Checkout Python infrastructure code
-      - name: Checkout Code Base (code-dev)
-        uses: actions/checkout@v4
-        with:
-          ref: code-dev
-
-      # Step 2: Checkout stack configuration to a temporary directory
-      - name: Checkout Stack Configuration (stack-transit-dev)
-        uses: actions/checkout@v4
-        with:
-          ref: stack-transit-dev
-          path: temp-stack
-
-      # Step 3: Copy stack files over code files
-      - name: Overlay Stack Configuration
-        run: |
-          cp -f temp-stack/Pulumi.dev.yaml ./
-          cp -f temp-stack/Pulumi.yaml ./ 2>/dev/null || true
-          if [ -d "temp-stack/inputs" ]; then cp -rf temp-stack/inputs ./; fi
-          rm -rf temp-stack
-
-      # Step 4: Setup Python environment
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      # Step 5: Install dependencies
-      - name: Install Dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-
-      # Step 6: Setup Pulumi
-      - name: Setup Pulumi CLI
-        uses: pulumi/actions@v5
-
-      # Step 7: Login to Azure State Backend using stpulumistatedev1
-      - name: Login to Azure Blob State Backend
-        run: pulumi login azblob://stpulumistatedev1
-        env:
-          AZURE_STORAGE_ACCOUNT: ${{ secrets.AZURE_STORAGE_ACCOUNT }}
-          AZURE_STORAGE_KEY: ${{ secrets.AZURE_STORAGE_KEY }}
-
-      - name: Select or Create Dev Stack
+- name: Select or Create Dev Stack
         run: pulumi stack select dev || pulumi stack init dev
         env:
           PULUMI_BACKEND_URL: 'azblob://stpulumistatedev1'
           AZURE_STORAGE_ACCOUNT: ${{ secrets.AZURE_STORAGE_ACCOUNT }}
           AZURE_STORAGE_KEY: ${{ secrets.AZURE_STORAGE_KEY }}
+          PULUMI_CONFIG_PASSPHRASE: ${{ secrets.PULUMI_CONFIG_PASSPHRASE }}
 
       # Step 8: Preview changes
       - name: Pulumi Preview
@@ -77,6 +17,7 @@ jobs:
           AZURE_STORAGE_ACCOUNT: ${{ secrets.AZURE_STORAGE_ACCOUNT }}
           AZURE_STORAGE_KEY: ${{ secrets.AZURE_STORAGE_KEY }}
           NETBOX_DEV_TOKEN: ${{ secrets.NETBOX_DEV_TOKEN }}
+          PULUMI_CONFIG_PASSPHRASE: ${{ secrets.PULUMI_CONFIG_PASSPHRASE }}
 
       # Step 9: Deploy changes
       - name: Pulumi Deploy
@@ -89,3 +30,4 @@ jobs:
           AZURE_STORAGE_ACCOUNT: ${{ secrets.AZURE_STORAGE_ACCOUNT }}
           AZURE_STORAGE_KEY: ${{ secrets.AZURE_STORAGE_KEY }}
           NETBOX_DEV_TOKEN: ${{ secrets.NETBOX_DEV_TOKEN }}
+          PULUMI_CONFIG_PASSPHRASE: ${{ secrets.PULUMI_CONFIG_PASSPHRASE }}
