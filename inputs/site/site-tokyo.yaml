@@ -1,0 +1,8 @@
+slug: "tokyo-dc2"
+site_name: "Tokyo Datacenter"
+status: "active"
+description: "Tokyo Edge Site"
+facilities:
+  asn: 65002
+  prefixes:
+    - "10.20.0.0/16"
