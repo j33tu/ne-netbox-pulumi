@@ -1,0 +1,75 @@
+# ==============================
+# Pulumi
+# ==============================
+
+# Pulumi local state / metadata
+.pulumi/
+Pulumi.*.yaml
+
+# Keep the project definition
+# Pulumi.yaml is NOT ignored
+
+
+# ==============================
+# Python
+# ==============================
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Python packaging
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# ==============================
+# Environment / Secrets
+# ==============================
+
+.env
+.env.*
+!.env.example
+
+# ==============================
+# IDE / Editor
+# ==============================
+
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ==============================
+# OS files
+# ==============================
+
+# Windows
+Thumbs.db
+Desktop.ini
+
+# macOS
+.DS_Store
+
+# ==============================
+# Logs
+# ==============================
+
+*.log
+
+# ==============================
+# Terraform (if ever used)
+# ==============================
+
+.terraform/
+*.tfstate
+*.tfstate.*
+.terraform.lock.hcl

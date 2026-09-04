@@ -1,0 +1,19 @@
+region: "EMEA"
+subregion: "UK"
+country: "UK"
+site_code: "LON01"
+site_name: "LON01"
+network_id: 11 # Used to compute 10.10.0.0/16 and individual VLAN prefixes
+
+floors:
+  - floor_number: "09"
+    rooms:
+      - type: "IDF"
+        racks_count: 1
+      - type: "MDF"
+        racks_count: 2
+
+  - floor_number: "04"
+    rooms:
+      - type: "IDF"
+        racks_count: 2
