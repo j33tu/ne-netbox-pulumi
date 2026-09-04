@@ -1,29 +1,60 @@
+import glob
+import os
+import yaml
 import pulumi
 import pulumi_netbox as netbox
 
-# Load stack configuration values
-config = pulumi.Config()
-env = config.require("environment")
-region_slug = config.require("region_slug")
-netbox_url = config.require("netbox_url")
+# Container to export created resources
+created_sites = {}
 
-# Explicitly configure the NetBox provider using the stack's URL
-# (Note: NETBOX_API_TOKEN is automatically picked up from the environment variable)
-provider = netbox.Provider("netbox-provider",
-    endpoint=netbox_url
-)
+# 1. Locate all YAML files in the inputs directory
+input_files = glob.glob(os.path.join("inputs", "*.yaml"))
 
-# Create a dynamic NetBox region using the explicitly defined provider
-region = netbox.Region(f"region-{env}",
-    name=f"US East ({env.upper()})",
-    slug=region_slug,
-    description=f"Primary geographic region managed by Pulumi ({env} environment)",
-    opts=pulumi.ResourceOptions(provider=provider)
-)
+if not input_files:
+    pulumi.log.warn("No site input files found in inputs/ folder.")
 
-# Export key resource outputs for CI/CD logs
-pulumi.export("region_id", region.id)
-pulumi.export("region_name", region.name)
-pulumi.export("region_slug", region.slug)
-pulumi.export("environment", env)
-pulumi.export("netbox_endpoint", netbox_url)
+# 2. Iterate through each site file and provision resources
+for file_path in input_files:
+    with open(file_path, "r") as f:
+        config = yaml.safe_load(f)
+
+    site_slug = config["slug"]
+    site_name = config["site_name"]
+
+    # Create NetBox Site Resource
+    site = netbox.Site(
+        f"site-{site_slug}",
+        name=site_name,
+        slug=site_slug,
+        status="active",
+        comments=config.get("description", ""),
+    )
+
+    # Create ASN if specified
+    asn_resource = None
+    if "facilities" in config and "asn" in config["facilities"]:
+        asn_val = config["facilities"]["asn"]
+        asn_resource = netbox.Asn(
+            f"asn-{site_slug}-{asn_val}",
+            asn=asn_val,
+            rir_id=1,  # Example RIR ID
+        )
+
+    # Create Prefixes under this Site
+    if "facilities" in config and "prefixes" in config["facilities"]:
+        for prefix_cidr in config["facilities"]["prefixes"]:
+            # Format resource name cleanly for Pulumi tracking
+            resource_safe_prefix = prefix_cidr.replace("/", "_").replace(".", "_")
+
+            netbox.Prefix(
+                f"prefix-{site_slug}-{resource_safe_prefix}",
+                prefix=prefix_cidr,
+                site_id=site.id,  # Wire dependency directly to the created Site ID
+                status="active",
+            )
+
+    # Save created site ID for Pulumi Outputs
+    created_sites[site_slug] = site.id
+
+# 3. Export all deployed Site IDs as stack outputs
+pulumi.export("deployed_sites", created_sites)
