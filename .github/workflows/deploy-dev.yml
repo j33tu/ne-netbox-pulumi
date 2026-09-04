@@ -3,11 +3,15 @@ name: Deploy Dev NetBox Infrastructure
 on:
   push:
     branches:
-      - code-dev
+      - stack-transit-dev
+    paths:
+      - 'Pulumi.dev.yaml'
+      - 'Pulumi.yaml'
+      - 'inputs/**'
 
 jobs:
   deploy-dev:
-    name: Pulumi Deploy (Dev)
+    name: Pulumi Preview & Deploy (Dev)
     runs-on: ubuntu-latest
 
     steps:
@@ -41,7 +45,20 @@ jobs:
           AZURE_STORAGE_ACCOUNT: ${{ secrets.AZURE_STORAGE_ACCOUNT }}
           AZURE_STORAGE_KEY: ${{ secrets.AZURE_STORAGE_KEY }}
 
-      - name: Pulumi Up
+      # Step 1: Run Pulumi Preview to show changes in job logs
+      - name: Pulumi Preview
+        uses: pulumi/actions@v5
+        with:
+          command: preview
+          stack-name: dev
+        env:
+          PULUMI_BACKEND_URL: 'azblob://pulumistate'
+          AZURE_STORAGE_ACCOUNT: ${{ secrets.AZURE_STORAGE_ACCOUNT }}
+          AZURE_STORAGE_KEY: ${{ secrets.AZURE_STORAGE_KEY }}
+          NETBOX_DEV_TOKEN: ${{ secrets.NETBOX_DEV_TOKEN }}
+
+      # Step 2: Apply changes to NetBox
+      - name: Pulumi Deploy
         uses: pulumi/actions@v5
         with:
           command: up
