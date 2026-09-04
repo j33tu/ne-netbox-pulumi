@@ -15,8 +15,18 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Code
+      # Step 1: Checkout Python infrastructure code from code-dev
+      - name: Checkout Code Base (code-dev)
         uses: actions/checkout@v4
+        with:
+          ref: code-dev
+
+      # Step 2: Overlay stack files from stack-transit-dev
+      - name: Checkout Stack Configuration (stack-transit-dev)
+        uses: actions/checkout@v4
+        with:
+          ref: stack-transit-dev
+          path: .
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -45,7 +55,7 @@ jobs:
           AZURE_STORAGE_ACCOUNT: ${{ secrets.AZURE_STORAGE_ACCOUNT }}
           AZURE_STORAGE_KEY: ${{ secrets.AZURE_STORAGE_KEY }}
 
-      # Step 1: Run Pulumi Preview to show changes in job logs
+      # Step 3: Run Pulumi Preview
       - name: Pulumi Preview
         uses: pulumi/actions@v5
         with:
@@ -57,13 +67,12 @@ jobs:
           AZURE_STORAGE_KEY: ${{ secrets.AZURE_STORAGE_KEY }}
           NETBOX_DEV_TOKEN: ${{ secrets.NETBOX_DEV_TOKEN }}
 
-      # Step 2: Apply changes to NetBox
+      # Step 4: Apply changes to NetBox
       - name: Pulumi Deploy
         uses: pulumi/actions@v5
         with:
           command: up
           stack-name: dev
-          yes: true
         env:
           PULUMI_BACKEND_URL: 'azblob://pulumistate'
           AZURE_STORAGE_ACCOUNT: ${{ secrets.AZURE_STORAGE_ACCOUNT }}
