@@ -28,7 +28,7 @@ jobs:
           ref: stack-transit-dev
           path: temp-stack
 
-      # Step 3: Copy stack files over code files without deleting requirements.txt
+      # Step 3: Copy stack files over code files before Python setup runs
       - name: Overlay Stack Configuration
         run: |
           cp -f temp-stack/Pulumi.dev.yaml ./
@@ -36,12 +36,11 @@ jobs:
           if [ -d "temp-stack/inputs" ]; then cp -rf temp-stack/inputs ./; fi
           rm -rf temp-stack
 
-      # Step 4: Setup Python environment
+      # Step 4: Setup Python environment (cache removed to prevent early lookup errors)
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-          cache: 'pip'
 
       # Step 5: Install dependencies
       - name: Install Dependencies
