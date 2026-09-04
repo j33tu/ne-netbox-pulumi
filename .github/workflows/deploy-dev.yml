@@ -45,26 +45,25 @@ jobs:
         with:
           python-version: '3.11'
 
-      # Step 5: Setup Pulumi CLI (Placed before pip to support setup scripts)
+      # Step 5: Setup Pulumi CLI
       - name: Setup Pulumi CLI
         uses: pulumi/actions@v5
 
-      # Step 6: Install dependencies globally and in virtualenv
+      # Step 6: Install dependencies skipping build-time plugin verification
       - name: Install Dependencies
         run: |
-          # 1. Pre-install plugin if required by pip package build scripts
-          pulumi plugin install resource netbox 0.0.3 || true
-
-          # 2. Upgrade pip and install requirements globally
+          # Upgrade pip
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
 
-          # 3. Create venv and install dependencies inside it
+          # Create virtualenv
           python -m venv venv
           ./venv/bin/python -m pip install --upgrade pip
-          ./venv/bin/pip install -r requirements.txt
 
-          # 4. Export virtualenv and site-packages to environment
+          # Install packages bypassing wheel build isolation plugin checks
+          PULUMI_SKIP_UPDATE_CHECK=true pip install --no-build-isolation -r requirements.txt || pip install -r requirements.txt
+          PULUMI_SKIP_UPDATE_CHECK=true ./venv/bin/pip install --no-build-isolation -r requirements.txt || ./venv/bin/pip install -r requirements.txt
+
+          # Export virtualenv and site-packages to environment
           SITE_PACKAGES=$(python -c "import site; print(site.getsitepackages()[0])")
           echo "$GITHUB_WORKSPACE/venv/bin" >> $GITHUB_PATH
           echo "PYTHONPATH=.:$SITE_PACKAGES:$GITHUB_WORKSPACE/venv/lib/python3.11/site-packages" >> $GITHUB_ENV
