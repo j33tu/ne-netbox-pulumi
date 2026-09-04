@@ -45,12 +45,15 @@ jobs:
         with:
           python-version: '3.11'
 
-      # Step 5: Create explicit virtual environment and install packages inside it
+      # Step 5: Create virtualenv, install packages, and export PATH
       - name: Install Dependencies
         run: |
           python -m venv venv
           ./venv/bin/python -m pip install --upgrade pip
           ./venv/bin/pip install -r requirements.txt
+          
+          # Force runner PATH to prioritize virtualenv binaries
+          echo "$GITHUB_WORKSPACE/venv/bin" >> $GITHUB_PATH
 
       # Step 6: Setup Pulumi CLI
       - name: Setup Pulumi CLI
