@@ -12,7 +12,7 @@ from modules.cabling import CablingModule
 # Configuration & Provider Setup
 config = pulumi.Config("netbox")
 server_url = config.get("serverUrl")
-api_token = os.getenv("NETBOX_DEV_TOKEN")
+api_token = os.getenv("NETBOX_PRD_TOKEN") or os.getenv("NETBOX_DEV_TOKEN")
 
 netbox_provider = netbox.Provider(
     "netbox-provider",
@@ -25,7 +25,7 @@ opts = pulumi.ResourceOptions(provider=netbox_provider)
 # Instantiate Domain Modules
 infra_mod = InfrastructureModule(opts=opts)
 ipam_mod = IPAMModule(opts=opts)
-devices_mod = DevicesModule(opts=opts)
+devices_mod = DevicesModule(opts=opts, server_url=server_url, api_token=api_token)
 cabling_mod = CablingModule(opts=opts)
 
 input_files = sorted(glob.glob("inputs/site/*.yaml") + glob.glob("inputs/site/*.yml"))
@@ -55,7 +55,7 @@ for file_path in input_files:
         for rm in fl.get("rooms", []):
             rm_type = rm["type"]
             location_slug = f"{site_code}-{fl_num}-{rm_type}".lower()
-            
+
             # Fetch created Location reference
             location = infra_mod.location_resources.get(location_slug)
 

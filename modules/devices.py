@@ -1,39 +1,69 @@
 import pulumi
 import pulumi_netbox as netbox
+import pynetbox
 
 
 class DevicesModule:
-    def __init__(self, opts: pulumi.ResourceOptions):
+    def __init__(self, opts: pulumi.ResourceOptions, server_url: str, api_token: str):
         self.opts = opts
         self._shared_cache = {}
+        # Direct read-only client used purely to check for pre-existing objects
+        # (e.g. seeded by the NetBox Data Exchange import) before asking Pulumi
+        # to create them.
+        self._nb = pynetbox.api(server_url, token=api_token)
 
     def _get_or_create_manufacturer(self, name: str):
         slug = name.lower().replace(" ", "-")
-        if slug not in self._shared_cache:
-            self._shared_cache[slug] = netbox.Manufacturer(
+        if slug in self._shared_cache:
+            return self._shared_cache[slug]
+
+        existing = self._nb.dcim.manufacturers.get(slug=slug)
+        if existing:
+            pulumi.log.info(f"Manufacturer '{name}' already exists in NetBox (id={existing.id}); adopting it.")
+            resource = netbox.Manufacturer.get(f"mfg-{slug}", str(existing.id), opts=self.opts)
+        else:
+            resource = netbox.Manufacturer(
                 f"mfg-{slug}",
                 name=name,
                 slug=slug,
                 opts=self.opts,
             )
-        return self._shared_cache[slug]
+
+        self._shared_cache[slug] = resource
+        return resource
 
     def _get_or_create_device_role(self, name: str, color_hex: str = "00ff00"):
         slug = name.lower().replace(" ", "-")
-        if slug not in self._shared_cache:
-            self._shared_cache[slug] = netbox.DeviceRole(
+        if slug in self._shared_cache:
+            return self._shared_cache[slug]
+
+        existing = self._nb.dcim.device_roles.get(slug=slug)
+        if existing:
+            pulumi.log.info(f"DeviceRole '{name}' already exists in NetBox (id={existing.id}); adopting it.")
+            resource = netbox.DeviceRole.get(f"role-{slug}", str(existing.id), opts=self.opts)
+        else:
+            resource = netbox.DeviceRole(
                 f"role-{slug}",
                 name=name,
                 slug=slug,
                 color_hex=color_hex,
                 opts=self.opts,
             )
-        return self._shared_cache[slug]
+
+        self._shared_cache[slug] = resource
+        return resource
 
     def _get_or_create_device_type(self, model: str, manufacturer_id: pulumi.Output, u_height: int = 1):
         slug = model.lower().replace(" ", "-")
-        if slug not in self._shared_cache:
-            self._shared_cache[slug] = netbox.DeviceType(
+        if slug in self._shared_cache:
+            return self._shared_cache[slug]
+
+        existing = self._nb.dcim.device_types.get(slug=slug)
+        if existing:
+            pulumi.log.info(f"DeviceType '{model}' already exists in NetBox (id={existing.id}); adopting it.")
+            resource = netbox.DeviceType.get(f"devtype-{slug}", str(existing.id), opts=self.opts)
+        else:
+            resource = netbox.DeviceType(
                 f"devtype-{slug}",
                 model=model,
                 slug=slug,
@@ -41,7 +71,9 @@ class DevicesModule:
                 u_height=u_height,
                 opts=self.opts,
             )
-        return self._shared_cache[slug]
+
+        self._shared_cache[slug] = resource
+        return resource
 
     def create_device(
         self,
