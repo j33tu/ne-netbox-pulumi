@@ -1,5 +1,4 @@
-encryptionsalt: v1:your-encryption-salt-here
 config:
-  ne-netbox-pulumi:environment: prd
-  ne-netbox-pulumi:region_slug: us-east-prd
-  ne-netbox-pulumi:netbox_url: https://bcdg8981.cloud.netboxapp.com
+  ne-netbox-pulumi:environment: dev
+  netbox:serverUrl: https://bcdg8981.cloud.netboxapp.com/
+  ne-netbox-pulumi:region_slug: us-east-dev
