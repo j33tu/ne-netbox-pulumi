@@ -8,38 +8,38 @@ class CablingModule:
 
     def connect_interfaces(
         self,
-        device_a_id: pulumi.Output,
-        interface_a_name: str,
-        device_b_id: pulumi.Output,
-        interface_b_name: str,
-        cable_id_name: str = None,  # <-- Added missing keyword argument
+        cable_id_name: str,
+        a_device_id: pulumi.Output,
+        a_interface_name: str,
+        b_device_id: pulumi.Output,
+        b_interface_name: str,
+        cable_type: str = "cat6a",
         cable_status: str = "connected",
-        **kwargs,  # Protects against any future unexpected keyword arguments
+        **kwargs,
     ):
-        cable_name = cable_id_name or f"cable-{interface_a_name}-{interface_b_name}"
-        resource_slug = cable_name.lower().replace("/", "-")
+        cable_slug = cable_id_name.lower().replace("/", "-")
 
-        # Interface A
+        # Create Side A Interface
         int_a = netbox.Interface(
-            f"int-a-{resource_slug}",
-            name=interface_a_name,
-            device_id=device_a_id,
+            f"int-a-{cable_slug}",
+            name=a_interface_name,
+            device_id=a_device_id,
             type="10gbase-x-sfpp",
             opts=self.opts,
         )
 
-        # Interface B
+        # Create Side B Interface
         int_b = netbox.Interface(
-            f"int-b-{resource_slug}",
-            name=interface_b_name,
-            device_id=device_b_id,
+            f"int-b-{cable_slug}",
+            name=b_interface_name,
+            device_id=b_device_id,
             type="10gbase-x-sfpp",
             opts=self.opts,
         )
 
-        # Cable
+        # Create Cable Connection
         cable = netbox.Cable(
-            f"cable-{resource_slug}",
+            f"cable-{cable_slug}",
             a_terminations=[
                 netbox.CableATerminationArgs(
                     object_id=int_a.id,
@@ -52,6 +52,7 @@ class CablingModule:
                     object_type="dcim.interface",
                 )
             ],
+            type=cable_type,
             status=cable_status,
             opts=self.opts,
         )
