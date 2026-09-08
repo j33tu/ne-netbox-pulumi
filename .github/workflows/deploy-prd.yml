@@ -118,4 +118,7 @@ jobs:
         run: pulumi up --stack prd --yes --non-interactive
         env:
           PULUMI_BACKEND_URL: 'azblob://stpulumistateprd1'
-          AZURE_STORAGE_ACCOUNT: ${{
+          AZURE_STORAGE_ACCOUNT: ${{ secrets.AZURE_STORAGE_ACCOUNT }}
+          AZURE_STORAGE_KEY: ${{ secrets.AZURE_STORAGE_KEY }}
+          NETBOX_PRD_TOKEN: ${{ secrets.NETBOX_PRD_TOKEN }}
+          PULUMI_CONFIG_PASSPHRASE: ${{ secrets.PULUMI_CONFIG_PASSPHRASE }}
