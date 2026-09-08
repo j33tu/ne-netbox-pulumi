@@ -12,21 +12,7 @@ from modules.cabling import CablingModule
 # Configuration & Provider Setup
 config = pulumi.Config("netbox")
 server_url = config.get("serverUrl")
-
-# Retrieve API Token dynamically across environments with proper fallback
-api_token = (
-    os.getenv("NETBOX_PRD_TOKEN")
-    or os.getenv("NETBOX_PROD_TOKEN")
-    or os.getenv("NETBOX_DEV_TOKEN")
-    or os.getenv("NETBOX_API_TOKEN")
-    or config.get("apiToken")
-)
-
-if not api_token:
-    raise ValueError(
-        "NetBox API token missing! Ensure NETBOX_PRD_TOKEN or NETBOX_DEV_TOKEN "
-        "is set in your environment or workflow."
-    )
+api_token = os.getenv("NETBOX_PRD_TOKEN") or os.getenv("NETBOX_DEV_TOKEN")
 
 netbox_provider = netbox.Provider(
     "netbox-provider",
@@ -39,7 +25,7 @@ opts = pulumi.ResourceOptions(provider=netbox_provider)
 # Instantiate Domain Modules
 infra_mod = InfrastructureModule(opts=opts)
 ipam_mod = IPAMModule(opts=opts)
-devices_mod = DevicesModule(opts=opts)
+devices_mod = DevicesModule(opts=opts, server_url=server_url, api_token=api_token)
 cabling_mod = CablingModule(opts=opts)
 
 input_files = sorted(glob.glob("inputs/site/*.yaml") + glob.glob("inputs/site/*.yml"))
