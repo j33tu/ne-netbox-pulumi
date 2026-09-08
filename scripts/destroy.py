@@ -2,8 +2,8 @@ import os
 import requests
 
 # Configuration
-NETBOX_URL = os.getenv("NETBOX_SERVER_URL", "https://myas9346.cloud.netboxapp.com").rstrip("/")
-API_TOKEN = "nbt_nm0Yrq5CbhBk.fqIWKWYP6WySjYhdgdQBrwfQJrwkAdjn4bRwlvFZ"
+NETBOX_URL = os.getenv("NETBOX_SERVER_URL", "https://bcdg8981.cloud.netboxapp.com").rstrip("/")
+API_TOKEN = "nbt_eak2V0z8GM1U.rDdSWlnnyb6AN8XwaQyXuYP0HXqE03r98WziHBCH"
 
 if not API_TOKEN:
     raise ValueError("Missing 'NETBOX_DEV_TOKEN' environment variable.")

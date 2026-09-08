@@ -1,0 +1,19 @@
+region: "APAC"
+subregion: "SIG"
+country: "Singapore"
+site_code: "SIN01"
+site_name: "SIN01"
+network_id: 13 # Used to compute 10.10.0.0/16 and individual VLAN prefixes
+
+floors:
+  - floor_number: "01"
+    rooms:
+      - type: "IDF"
+        racks_count: 1
+      - type: "MDF"
+        racks_count: 1
+
+  - floor_number: "02"
+    rooms:
+      - type: "IDF"
+        racks_count: 1

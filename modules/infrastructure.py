@@ -1,79 +1,102 @@
 import pulumi
 import pulumi_netbox as netbox
 
+
 class InfrastructureModule:
     def __init__(self, opts: pulumi.ResourceOptions):
         self.opts = opts
-        self.regions = {}
-        self.sites = {}
-        self.locations = {}
-        self.racks = {}
+        self.region_resources = {}
+        # 1. Initialize lookup dictionaries
+        self.location_resources = {}
+        self.rack_resources = {}
 
     def get_or_create_region(self, region_name: str, parent_region_id=None):
         slug = region_name.lower().strip().replace(" ", "-")
-        if slug not in self.regions:
+
+        if slug not in self.region_resources:
             resource_args = {"name": region_name, "slug": slug}
-            if parent_region_id:
+            if parent_region_id is not None:
                 resource_args["parent_region_id"] = parent_region_id
 
-            prefix = "subregion" if parent_region_id else "region"
-            self.regions[slug] = netbox.Region(
+            prefix = "subregion" if parent_region_id is not None else "region"
+
+            self.region_resources[slug] = netbox.Region(
                 f"{prefix}-{slug}",
                 **resource_args,
-                opts=self.opts
+                opts=self.opts,
             )
-        return self.regions[slug]
+
+        return self.region_resources[slug]
 
     def create_site_infrastructure(self, site_data: dict):
         site_code = site_data["site_code"]
         site_slug = site_code.lower()
         site_name = site_data.get("site_name", site_code)
 
-        # Parent & Sub-region logic
-        parent_reg = self.get_or_create_region(site_data["region"]) if site_data.get("region") else None
-        sub_reg = self.get_or_create_region(site_data["subregion"], parent_reg.id) if site_data.get("subregion") else None
+        # Regions
+        parent_region = None
+        if site_data.get("region"):
+            parent_region = self.get_or_create_region(site_data["region"])
 
+        sub_region = None
+        if site_data.get("subregion"):
+            parent_id = parent_region.id if parent_region else None
+            sub_region = self.get_or_create_region(
+                site_data["subregion"], parent_region_id=parent_id
+            )
+
+        # Site
         site_args = {
             "name": site_name,
             "slug": site_slug,
             "status": "active",
             "comments": f"Country: {site_data.get('country', 'N/A')}",
         }
-        if sub_reg:
-            site_args["region_id"] = sub_reg.id
-        elif parent_reg:
-            site_args["region_id"] = parent_reg.id
+        if sub_region:
+            site_args["region_id"] = sub_region.id
+        elif parent_region:
+            site_args["region_id"] = parent_region.id
 
-        site = netbox.Site(f"site-{site_slug}", **site_args, opts=self.opts)
-        self.sites[site_code] = site
+        site = netbox.Site(
+            f"site-{site_slug}",
+            **site_args,
+            opts=self.opts,
+        )
 
-        # Floors, Locations & Racks
-        for fl in site_data.get("floors", []):
+        # Locations & Racks
+        floors = site_data.get("floors", [])
+        for fl in floors:
             fl_num = str(fl["floor_number"]).zfill(2)
             for rm in fl.get("rooms", []):
                 rm_type = rm["type"]
-                loc_name = f"{site_code}-{fl_num}-{rm_type}"
-                loc_slug = loc_name.lower()
+                location_name = f"{site_code}-{fl_num}-{rm_type}"
+                location_slug = location_name.lower()
 
                 location = netbox.Location(
-                    f"loc-{loc_slug}",
-                    name=loc_name,
-                    slug=loc_slug,
+                    f"loc-{location_slug}",
+                    name=location_name,
+                    slug=location_slug,
                     site_id=site.id,
-                    opts=self.opts
+                    opts=self.opts,
                 )
-                self.locations[loc_name] = location
+                # 2. Track Location resource for device mapping
+                self.location_resources[location_slug] = location
 
                 for r in range(1, rm.get("racks_count", 0) + 1):
-                    rack_name = f"{loc_name}-R{str(r).zfill(2)}"
-                    self.racks[rack_name] = netbox.Rack(
-                        f"rack-{rack_name.lower()}",
+                    rack_num = str(r).zfill(2)
+                    rack_name = f"{location_name}-R{rack_num}"
+                    rack_slug = rack_name.lower()
+
+                    rack = netbox.Rack(
+                        f"rack-{rack_slug}",
                         name=rack_name,
                         site_id=site.id,
                         location_id=location.id,
                         status="active",
                         width=19,
-                        opts=self.opts
+                        opts=self.opts,
                     )
+                    # 3. Track Rack resource for device mapping
+                    self.rack_resources[rack_slug] = rack
 
         return site
