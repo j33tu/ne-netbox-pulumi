@@ -1,18 +1,18 @@
-import os
 import glob
-import yaml
+import os
 import pulumi
 import pulumi_netbox as netbox
+import yaml
 
-# 1. Configuration & Provider Setup
+from modules.infrastructure import InfrastructureModule
+from modules.ipam import IPAMModule
+from modules.devices import DevicesModule
+from modules.cabling import CablingModule
+
+# Configuration & Provider Setup
 config = pulumi.Config("netbox")
 server_url = config.get("serverUrl")
 api_token = os.getenv("NETBOX_DEV_TOKEN")
-
-if not server_url:
-    raise ValueError("Missing 'netbox:serverUrl' in stack configuration file.")
-if not api_token:
-    raise ValueError("Missing 'NETBOX_DEV_TOKEN' environment variable.")
 
 netbox_provider = netbox.Provider(
     "netbox-provider",
@@ -20,191 +20,74 @@ netbox_provider = netbox.Provider(
     api_token=api_token,
 )
 
-# Global resource options
 opts = pulumi.ResourceOptions(provider=netbox_provider)
 
-# Options specifically for Prefixes to ensure old subnets are deleted before replaced
-prefix_opts = pulumi.ResourceOptions(
-    provider=netbox_provider,
-    delete_before_replace=True,
-)
+# Instantiate Domain Modules
+infra_mod = InfrastructureModule(opts=opts)
+ipam_mod = IPAMModule(opts=opts)
+devices_mod = DevicesModule(opts=opts)
+cabling_mod = CablingModule(opts=opts)
 
-# Standard VLAN specifications relative to network_id input
-VLAN_SPECS = [
-    {"vid": 64,  "name": "Security", "offset": 64,  "mask": 21},
-    {"vid": 72,  "name": "IOT",      "offset": 72,  "mask": 21},
-    {"vid": 136, "name": "CORP",     "offset": 136, "mask": 21},
-    {"vid": 200, "name": "AV",       "offset": 200, "mask": 21},
-    {"vid": 240, "name": "Guest",    "offset": 240, "mask": 21},
-    {"vid": 255, "name": "MGMT",     "offset": 254, "mask": 23},
-]
-
-# Track region resources in memory across all YAML files in the stack
-region_resources = {}
-created_sites = {}
-
-
-def get_or_create_region(region_name: str, parent_region_id=None):
-    """
-    Ensures a single netbox.Region Pulumi resource is registered per unique slug.
-    Reuses the existing Pulumi resource if referenced multiple times across site files.
-    """
-    slug = region_name.lower().strip().replace(" ", "-")
-
-    if slug not in region_resources:
-        resource_args = {
-            "name": region_name,
-            "slug": slug,
-        }
-        if parent_region_id is not None:
-            resource_args["parent_region_id"] = parent_region_id
-
-        prefix = "subregion" if parent_region_id is not None else "region"
-
-        region_resources[slug] = netbox.Region(
-            f"{prefix}-{slug}",
-            **resource_args,
-            opts=opts,
-        )
-
-    return region_resources[slug]
-
-
-# 2. Process All Input YAML Files
 input_files = sorted(glob.glob("inputs/site/*.yaml") + glob.glob("inputs/site/*.yml"))
 
-if not input_files:
-    pulumi.log.warn("No site input files found in inputs/site/ directory.")
-
 for file_path in input_files:
-    try:
-        with open(file_path, "r") as f:
-            site_data = yaml.safe_load(f)
-    except Exception as e:
-        pulumi.log.error(f"Failed to read file {file_path}: {e}")
-        continue
+    with open(file_path, "r") as f:
+        site_data = yaml.safe_load(f)
 
-    if not site_data or not isinstance(site_data, dict) or "site_code" not in site_data:
-        pulumi.log.warn(f"Skipping invalid YAML file (missing 'site_code'): {file_path}")
+    if not site_data or "site_code" not in site_data:
         continue
 
     site_code = site_data["site_code"]
-    site_slug = site_code.lower()
-    site_name = site_data.get("site_name", site_code)
     net_id = site_data.get("network_id")
 
-    # A. Parent Region (e.g., APAC, EMEA)
-    parent_region = None
-    if site_data.get("region"):
-        parent_region = get_or_create_region(site_data["region"])
+    # 1. Infrastructure (Site, Locations, Racks)
+    site = infra_mod.create_site_infrastructure(site_data)
 
-    # B. Subregion (e.g., IND, JPN, UK)
-    sub_region = None
-    if site_data.get("subregion"):
-        parent_id = parent_region.id if parent_region else None
-        sub_region = get_or_create_region(site_data["subregion"], parent_region_id=parent_id)
+    # 2. IPAM (VLANs & Subnets)
+    if net_id is not None:
+        ipam_mod.create_site_ipam(site_code=site_code, site_id=site.id, net_id=net_id)
 
-    # C. Site Resource Creation
-    site_args = {
-        "name": site_name,
-        "slug": site_slug,
-        "status": "active",
-        "comments": f"Country: {site_data.get('country', 'N/A')}",
-    }
-
-    # Assign region precedence (Subregion > Parent Region)
-    if sub_region:
-        site_args["region_id"] = sub_region.id
-    elif parent_region:
-        site_args["region_id"] = parent_region.id
-
-    site = netbox.Site(
-        f"site-{site_slug}",
-        **site_args,
-        opts=opts,
-    )
-
-    # D. Location Hierarchy & Rack Allocation
+    # 3. Devices
+    created_devices = {}
     floors = site_data.get("floors", [])
     for fl in floors:
         fl_num = str(fl["floor_number"]).zfill(2)
-        rooms = fl.get("rooms", [])
+        for rm in fl.get("rooms", []):
+            rm_type = rm["type"]
+            location_slug = f"{site_code}-{fl_num}-{rm_type}".lower()
+            
+            # Fetch created Location reference
+            location = infra_mod.location_resources.get(location_slug)
 
-        for rm in rooms:
-            rm_type = rm["type"]  # IDF or MDF
-            location_name = f"{site_code}-{fl_num}-{rm_type}"
-            location_slug = location_name.lower()
+            for dev_cfg in rm.get("devices", []):
+                rack_name = f"{site_code}-{fl_num}-{rm_type}-R01".lower()
+                rack = infra_mod.rack_resources.get(rack_name)
 
-            location = netbox.Location(
-                f"loc-{location_slug}",
-                name=location_name,
-                slug=location_slug,
-                site_id=site.id,
-                opts=opts,
-            )
-
-            rack_count = rm.get("racks_count", 0)
-            for r in range(1, rack_count + 1):
-                rack_num = str(r).zfill(2)
-                rack_name = f"{location_name}-R{rack_num}"
-
-                netbox.Rack(
-                    f"rack-{rack_name.lower()}",
-                    name=rack_name,
+                device = devices_mod.create_device(
+                    name=dev_cfg["name"],
                     site_id=site.id,
-                    location_id=location.id,
-                    status="active",
-                    width=19,
-                    opts=opts,
+                    location_id=location.id if location else None,
+                    rack_id=rack.id if rack else None,
+                    position=dev_cfg.get("position", 1),
+                    model=dev_cfg.get("model", "Generic Switch"),
+                    manufacturer=dev_cfg.get("manufacturer", "Generic"),
+                    role=dev_cfg.get("role", "Access Switch"),
                 )
+                created_devices[dev_cfg["name"]] = device
 
-    # E. Network & VLAN Subnet Allocation
-    if net_id is not None:
-        parent_cidr = f"10.{net_id}.0.0/16"
+    # 4. Cabling (Depends on Devices)
+    for cable_cfg in site_data.get("cabling", []):
+        dev_a = created_devices.get(cable_cfg["device_a"])
+        dev_b = created_devices.get(cable_cfg["device_b"])
 
-        # Parent /16 Prefix Resource
-        netbox.Prefix(
-            f"prefix-{site_slug}-10_{net_id}_0_0_16",
-            prefix=parent_cidr,
-            site_id=site.id,
-            status="active",
-            description=f"Global Prefix for {site_code}",
-            opts=prefix_opts,
-        )
-
-        # VLAN and Specific Subnet Resources
-        for vspec in VLAN_SPECS:
-            vid = vspec["vid"]
-            vname = vspec["name"]
-            offset = vspec["offset"]
-            mask = vspec["mask"]
-
-            vlan_prefix_cidr = f"10.{net_id}.{offset}.0/{mask}"
-
-            # 1. Create VLAN
-            vlan = netbox.Vlan(
-                f"vlan-{site_slug}-{vid}",
-                vid=vid,
-                name=vname,
-                site_id=site.id,
-                status="active",
-                opts=opts,
+        if dev_a and dev_b:
+            cabling_mod.connect_interfaces(
+                cable_id_name=cable_cfg["id"],
+                a_device_id=dev_a.id,
+                a_interface_name=cable_cfg["interface_a"],
+                b_device_id=dev_b.id,
+                b_interface_name=cable_cfg["interface_b"],
+                cable_type=cable_cfg.get("type", "cat6a"),
             )
 
-            # 2. Create Prefix with explicit dependency on VLAN creation
-            netbox.Prefix(
-                f"prefix-{site_slug}-{vid}",
-                prefix=vlan_prefix_cidr,
-                site_id=site.id,
-                vlan_id=vlan.id,
-                status="active",
-                description=f"{vname} Subnet",
-                opts=prefix_opts.merge(
-                    pulumi.ResourceOptions(depends_on=[vlan])
-                ),
-            )
-
-    created_sites[site_code] = site.id
-
-# Stack Outputs
-pulumi.export("deployed_sites", created_sites)
+pulumi.export("status", "Deployment Completed Successfully")
