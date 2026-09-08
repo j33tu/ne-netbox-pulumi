@@ -6,44 +6,40 @@ class CablingModule:
     def __init__(self, opts: pulumi.ResourceOptions):
         self.opts = opts
 
-    def create_interface(self, name: str, device_id: pulumi.Output, type: str = "10gbase-x-sfpp"):
-        return netbox.Interface(
-            f"int-{name.lower().replace('/', '-')}",
-            name=name,
-            device_id=device_id,  # If device_id failed, try passing device_id or device_id
-            type=type,
-            opts=self.opts,
-        )
-
     def connect_interfaces(
         self,
         device_a_id: pulumi.Output,
         interface_a_name: str,
         device_b_id: pulumi.Output,
         interface_b_name: str,
+        cable_id_name: str = None,  # <-- Added missing keyword argument
         cable_status: str = "connected",
+        **kwargs,  # Protects against any future unexpected keyword arguments
     ):
-        # Create Interface A
+        cable_name = cable_id_name or f"cable-{interface_a_name}-{interface_b_name}"
+        resource_slug = cable_name.lower().replace("/", "-")
+
+        # Interface A
         int_a = netbox.Interface(
-            f"int-a-{interface_a_name.lower().replace('/', '-')}",
+            f"int-a-{resource_slug}",
             name=interface_a_name,
-            device_id=device_a_id,  # <-- Change device_id to device_id if needed or check provider docs
+            device_id=device_a_id,
             type="10gbase-x-sfpp",
             opts=self.opts,
         )
 
-        # Create Interface B
+        # Interface B
         int_b = netbox.Interface(
-            f"int-b-{interface_b_name.lower().replace('/', '-')}",
+            f"int-b-{resource_slug}",
             name=interface_b_name,
-            device_id=device_b_id,  # <-- Change device_id to device_id
+            device_id=device_b_id,
             type="10gbase-x-sfpp",
             opts=self.opts,
         )
 
-        # Cable connecting both interfaces
+        # Cable
         cable = netbox.Cable(
-            f"cable-{interface_a_name}-{interface_b_name}".lower().replace("/", "-"),
+            f"cable-{resource_slug}",
             a_terminations=[
                 netbox.CableATerminationArgs(
                     object_id=int_a.id,
