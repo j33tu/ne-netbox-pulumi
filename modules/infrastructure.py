@@ -6,6 +6,9 @@ class InfrastructureModule:
     def __init__(self, opts: pulumi.ResourceOptions):
         self.opts = opts
         self.region_resources = {}
+        # 1. Initialize lookup dictionaries
+        self.location_resources = {}
+        self.rack_resources = {}
 
     def get_or_create_region(self, region_name: str, parent_region_id=None):
         slug = region_name.lower().strip().replace(" ", "-")
@@ -76,13 +79,16 @@ class InfrastructureModule:
                     site_id=site.id,
                     opts=self.opts,
                 )
+                # 2. Track Location resource for device mapping
+                self.location_resources[location_slug] = location
 
                 for r in range(1, rm.get("racks_count", 0) + 1):
                     rack_num = str(r).zfill(2)
                     rack_name = f"{location_name}-R{rack_num}"
+                    rack_slug = rack_name.lower()
 
-                    netbox.Rack(
-                        f"rack-{rack_name.lower()}",
+                    rack = netbox.Rack(
+                        f"rack-{rack_slug}",
                         name=rack_name,
                         site_id=site.id,
                         location_id=location.id,
@@ -90,5 +96,7 @@ class InfrastructureModule:
                         width=19,
                         opts=self.opts,
                     )
+                    # 3. Track Rack resource for device mapping
+                    self.rack_resources[rack_slug] = rack
 
         return site
