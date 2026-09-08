@@ -67,7 +67,7 @@ class DevicesModule:
             location_id=location_id,
             rack_id=rack_id,
             rack_position=position,
-            face="front",
+            rack_face="front",  # <-- FIXED: changed 'face' to 'rack_face'
             device_type_id=dev_type.id,
             role_id=dev_role.id,
             status="active",
