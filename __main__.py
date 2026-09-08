@@ -12,7 +12,21 @@ from modules.cabling import CablingModule
 # Configuration & Provider Setup
 config = pulumi.Config("netbox")
 server_url = config.get("serverUrl")
-api_token = os.getenv("NETBOX_DEV_TOKEN")
+
+# Retrieve API Token dynamically across environments with proper fallback
+api_token = (
+    os.getenv("NETBOX_PRD_TOKEN")
+    or os.getenv("NETBOX_PROD_TOKEN")
+    or os.getenv("NETBOX_DEV_TOKEN")
+    or os.getenv("NETBOX_API_TOKEN")
+    or config.get("apiToken")
+)
+
+if not api_token:
+    raise ValueError(
+        "NetBox API token missing! Ensure NETBOX_PRD_TOKEN or NETBOX_DEV_TOKEN "
+        "is set in your environment or workflow."
+    )
 
 netbox_provider = netbox.Provider(
     "netbox-provider",
@@ -55,7 +69,7 @@ for file_path in input_files:
         for rm in fl.get("rooms", []):
             rm_type = rm["type"]
             location_slug = f"{site_code}-{fl_num}-{rm_type}".lower()
-            
+
             # Fetch created Location reference
             location = infra_mod.location_resources.get(location_slug)
 
