@@ -6,57 +6,58 @@ class CablingModule:
     def __init__(self, opts: pulumi.ResourceOptions):
         self.opts = opts
 
+    def create_interface(self, name: str, device_id: pulumi.Output, type: str = "10gbase-x-sfpp"):
+        return netbox.Interface(
+            f"int-{name.lower().replace('/', '-')}",
+            name=name,
+            device_id=device_id,  # If device_id failed, try passing device_id or device_id
+            type=type,
+            opts=self.opts,
+        )
+
     def connect_interfaces(
         self,
-        cable_id_name: str,
-        a_device_id: pulumi.Output,
-        a_interface_name: str,
-        b_device_id: pulumi.Output,
-        b_interface_name: str,
-        status: str = "connected",
-        cable_type: str = "cat6a",
+        device_a_id: pulumi.Output,
+        interface_a_name: str,
+        device_b_id: pulumi.Output,
+        interface_b_name: str,
+        cable_status: str = "connected",
     ):
-        """
-        Establishes a physical cable link between two device interfaces.
-        """
-        # 1. Instantiate Interface A
-        interface_a = netbox.Interface(
-            f"intf-{cable_id_name}-a",
-            device_id=a_device_id,
-            name=a_interface_name,
-            type="1000base-t",
+        # Create Interface A
+        int_a = netbox.Interface(
+            f"int-a-{interface_a_name.lower().replace('/', '-')}",
+            name=interface_a_name,
+            device_id=device_a_id,  # <-- Change device_id to device_id if needed or check provider docs
+            type="10gbase-x-sfpp",
             opts=self.opts,
         )
 
-        # 2. Instantiate Interface B
-        interface_b = netbox.Interface(
-            f"intf-{cable_id_name}-b",
-            device_id=b_device_id,
-            name=b_interface_name,
-            type="1000base-t",
+        # Create Interface B
+        int_b = netbox.Interface(
+            f"int-b-{interface_b_name.lower().replace('/', '-')}",
+            name=interface_b_name,
+            device_id=device_b_id,  # <-- Change device_id to device_id
+            type="10gbase-x-sfpp",
             opts=self.opts,
         )
 
-        # 3. Create Cable Object connecting A and B
+        # Cable connecting both interfaces
         cable = netbox.Cable(
-            f"cable-{cable_id_name}",
+            f"cable-{interface_a_name}-{interface_b_name}".lower().replace("/", "-"),
             a_terminations=[
                 netbox.CableATerminationArgs(
-                    object_id=interface_a.id,
+                    object_id=int_a.id,
                     object_type="dcim.interface",
                 )
             ],
             b_terminations=[
                 netbox.CableBTerminationArgs(
-                    object_id=interface_b.id,
+                    object_id=int_b.id,
                     object_type="dcim.interface",
                 )
             ],
-            status=status,
-            type=cable_type,
-            opts=self.opts.merge(
-                pulumi.ResourceOptions(depends_on=[interface_a, interface_b])
-            ),
+            status=cable_status,
+            opts=self.opts,
         )
 
         return cable
