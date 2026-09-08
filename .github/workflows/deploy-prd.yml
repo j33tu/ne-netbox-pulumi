@@ -1,52 +1,121 @@
-name: Deploy to NetBox Production
+name: Deploy Prod NetBox Infrastructure
 
 on:
   push:
     branches:
       - stack-transit-prd
+    paths:
+      - 'Pulumi.prd.yaml'
+      - 'Pulumi.yaml'
+      - 'inputs/**'
+
+env:
+  ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: "true"
 
 jobs:
   deploy-prd:
+    name: Pulumi Preview & Deploy (Prod)
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout Code (code-main)
+      # Step 1: Checkout Python infrastructure code base from code-main
+      - name: Checkout Code Base (code-main)
         uses: actions/checkout@v4
         with:
           ref: code-main
 
-      - name: Checkout Stack Config (stack-transit-prd)
+      # Step 2: Checkout stack configuration to a temporary directory
+      - name: Checkout Stack Configuration (stack-transit-prd)
         uses: actions/checkout@v4
         with:
           ref: stack-transit-prd
-          token: ${{ secrets.GITHUB_TOKEN }}
           path: temp-stack
 
-      - name: Merge Stack Files into Workspace
+      # Step 3: Overlay stack files on top of code files
+      - name: Overlay Stack Configuration
         run: |
-          # Copy Pulumi stack configuration files into the root project directory
-          cp temp-stack/Pulumi.prd.yaml ./ || true
+          cp -f temp-stack/Pulumi.prd.yaml ./
+          cp -f temp-stack/Pulumi.yaml ./ 2>/dev/null || true
+          if [ -d "temp-stack/inputs" ]; then cp -rf temp-stack/inputs ./; fi
+          rm -rf temp-stack
 
-      - name: Set up Python
+      # Step 4: Setup Python environment
+      - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
-          cache: "pip"
+          python-version: '3.11'
 
+      # Step 5: Setup Pulumi CLI
+      - name: Setup Pulumi CLI
+        uses: pulumi/actions@v5
+
+      # Step 6: Generate the NetBox provider SDK (Terraform-bridged, e-breuninger)
+      - name: Add NetBox Provider SDK
+        run: pulumi package add terraform-provider e-breuninger/netbox
+
+      # Step 7: Wire the local SDK into requirements.txt
+      - name: Link Local NetBox SDK into requirements.txt
+        run: |
+          sed -i '/^pulumi[-_]netbox/d' requirements.txt || true
+          echo "sdks/netbox" >> requirements.txt
+          cat requirements.txt
+
+      # Step 8: Install dependencies using pre-built wheels
       - name: Install Dependencies
         run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          python -m pip install --upgrade pip setuptools wheel
 
-      - name: Run Pulumi Up (Prod)
-        uses: pulumi/actions@v5
-        with:
-          command: up
-          stack-name: prd
-          cloud-url: azblob://netbox-pulumi-state  # Update with your actual Azure Blob container name
+          python -m venv venv
+          ./venv/bin/python -m pip install --upgrade pip setuptools wheel
+
+          PULUMI_SKIP_UPDATE_CHECK=true pip install --prefer-binary -r requirements.txt
+          PULUMI_SKIP_UPDATE_CHECK=true ./venv/bin/pip install --prefer-binary -r requirements.txt
+
+          SITE_PACKAGES=$(python -c "import site; print(site.getsitepackages()[0])")
+          echo "$GITHUB_WORKSPACE/venv/bin" >> $GITHUB_PATH
+          echo "PYTHONPATH=.:$SITE_PACKAGES:$GITHUB_WORKSPACE/venv/lib/python3.11/site-packages" >> $GITHUB_ENV
+
+      # Step 9: Auto-create container if missing
+      - name: Create Azure Container if Missing
+        run: |
+          az storage container create \
+            --name stpulumistateprd1 \
+            --account-name "$AZURE_STORAGE_ACCOUNT" \
+            --account-key "$AZURE_STORAGE_KEY" \
+            --output none
         env:
           AZURE_STORAGE_ACCOUNT: ${{ secrets.AZURE_STORAGE_ACCOUNT }}
           AZURE_STORAGE_KEY: ${{ secrets.AZURE_STORAGE_KEY }}
+
+      # Step 10: Authenticate to Azure Blob State Backend
+      - name: Login to Azure Blob State Backend
+        run: pulumi login azblob://stpulumistateprd1
+        env:
+          AZURE_STORAGE_ACCOUNT: ${{ secrets.AZURE_STORAGE_ACCOUNT }}
+          AZURE_STORAGE_KEY: ${{ secrets.AZURE_STORAGE_KEY }}
+
+      # Step 11: Select or create the prd stack with passphrase
+      - name: Select or Create Prod Stack
+        run: pulumi stack select prd || pulumi stack init prd
+        env:
+          PULUMI_BACKEND_URL: 'azblob://stpulumistateprd1'
+          AZURE_STORAGE_ACCOUNT: ${{ secrets.AZURE_STORAGE_ACCOUNT }}
+          AZURE_STORAGE_KEY: ${{ secrets.AZURE_STORAGE_KEY }}
           PULUMI_CONFIG_PASSPHRASE: ${{ secrets.PULUMI_CONFIG_PASSPHRASE }}
-          NETBOX_SERVER_URL: https://bcdg8981.cloud.netboxapp.com
-          NETBOX_PROD_TOKEN: ${{ secrets.NETBOX_PROD_TOKEN }}
-          NETBOX_ALLOW_UNSUPPORTED_VERSION: "true"
+
+      # Step 12: Run Pulumi Preview
+      - name: Pulumi Preview
+        run: pulumi preview --stack prd --non-interactive
+        env:
+          PULUMI_BACKEND_URL: 'azblob://stpulumistateprd1'
+          AZURE_STORAGE_ACCOUNT: ${{ secrets.AZURE_STORAGE_ACCOUNT }}
+          AZURE_STORAGE_KEY: ${{ secrets.AZURE_STORAGE_KEY }}
+          NETBOX_PRD_TOKEN: ${{ secrets.NETBOX_PRD_TOKEN }}
+          PULUMI_CONFIG_PASSPHRASE: ${{ secrets.PULUMI_CONFIG_PASSPHRASE }}
+
+      # Step 13: Apply changes to NetBox
+      - name: Pulumi Deploy
+        run: pulumi up --stack prd --yes --non-interactive
+        env:
+          PULUMI_BACKEND_URL: 'azblob://stpulumistateprd1'
+          AZURE_STORAGE_ACCOUNT: ${{
