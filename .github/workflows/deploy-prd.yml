@@ -9,11 +9,14 @@ jobs:
   deploy-prd:
     runs-on: ubuntu-latest
     steps:
+      # 1. Checkout main code explicitly to the root workspace (.)
       - name: Checkout Code (code-main)
         uses: actions/checkout@v4
         with:
           ref: code-main
+          path: .
 
+      # 2. Checkout stack configuration into a subfolder
       - name: Checkout Stack Config (stack-transit-prd)
         uses: actions/checkout@v4
         with:
@@ -21,10 +24,12 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           path: temp-stack
 
+      # 3. Copy the stack config into the root directory and verify files
       - name: Merge Stack Files into Workspace
         run: |
-          # Copy Pulumi stack configuration files into the root project directory
-          cp temp-stack/Pulumi.prd.yaml ./ || true
+          cp -v temp-stack/Pulumi.prd.yaml ./Pulumi.prd.yaml
+          echo "=== Verifying Workspace Files ==="
+          ls -la
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -37,12 +42,14 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      # 4. Explicitly pass work-dir to guarantee Pulumi runs against the root
       - name: Run Pulumi Up (Prod)
         uses: pulumi/actions@v5
         with:
           command: up
           stack-name: prd
-          cloud-url: azblob://stpulumistateprd1  # UPDATED: Target production state container
+          work-dir: .
+          cloud-url: azblob://stpulumistateprd1
         env:
           AZURE_STORAGE_ACCOUNT: ${{ secrets.AZURE_STORAGE_ACCOUNT }}
           AZURE_STORAGE_KEY: ${{ secrets.AZURE_STORAGE_KEY }}
