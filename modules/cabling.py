@@ -20,7 +20,7 @@ class CablingModule:
         cable_slug = cable_id_name.lower().replace("/", "-")
 
         # Create Side A Interface
-        int_a = netbox.Interface(
+        int_a = netbox.DeviceInterface(
             f"int-a-{cable_slug}",
             name=a_interface_name,
             device_id=a_device_id,
@@ -29,7 +29,7 @@ class CablingModule:
         )
 
         # Create Side B Interface
-        int_b = netbox.Interface(
+        int_b = netbox.DeviceInterface(
             f"int-b-{cable_slug}",
             name=b_interface_name,
             device_id=b_device_id,
@@ -42,13 +42,13 @@ class CablingModule:
             f"cable-{cable_slug}",
             a_terminations=[
                 netbox.CableATerminationArgs(
-                    object_id=int_a.id,
+                    object_id=int_a.device_interface_id,
                     object_type="dcim.interface",
                 )
             ],
             b_terminations=[
                 netbox.CableBTerminationArgs(
-                    object_id=int_b.id,
+                    object_id=int_b.device_interface_id,
                     object_type="dcim.interface",
                 )
             ],
